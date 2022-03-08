@@ -1,0 +1,9 @@
+name = "World"
+
+
+[[scene]]
+model_file = "ampel_mit_mast_oben.obj"
+name = "Ampel mit Mast"
+id = "a0c49f2b-5e48-48ee-85a2-86a88900617f"
+rotation = [3.2, 1.3, 2.3, 4.5]
+position = [0.0, 0.0, 0.0]

@@ -6,7 +6,7 @@ use wgpu::{BindGroup, BindGroupLayout, Buffer, Device};
 use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 pub(crate) struct Camera {
-    eye: cgmath::Point3<f32>,
+    pub(crate) eye: cgmath::Point3<f32>,
     target: cgmath::Point3<f32>,
     up: cgmath::Vector3<f32>,
     aspect: f32,
@@ -80,6 +80,11 @@ impl Camera {
 
         // 3.
         return util::OPENGL_TO_WGPU_MATRIX * proj * view;
+    }
+
+    pub(crate) fn update_aspect(&mut self, width: f32, height: f32) {
+        self.aspect = width as f32 / height as f32;
+        self.update_view_proj();
     }
 
     pub(crate) fn update_view_proj(&mut self) {
