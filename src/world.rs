@@ -5,7 +5,7 @@ pub struct SceneItem {
     pub model_file: String,
     pub name: String,
     pub id: String,
-    pub rotation: [f32; 4],
+    pub rotation: [f32; 3],
     pub position: [f32; 3],
 }
 

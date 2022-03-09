@@ -47,7 +47,7 @@ impl Camera {
             aspect: config.width as f32 / config.height as f32,
             fovy: 45.0,
             znear: 0.1,
-            zfar: 100.0,
+            zfar: 200.0,
             uniform: camera_uniform,
             buffer: camera_buffer,
             bind_group: camera_bind_group,
@@ -198,10 +198,10 @@ impl CameraController {
             // Rescale the distance between the target and eye so
             // that it doesn't change. The eye therefore still
             // lies on the circle made by the target and eye.
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
+            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
         }
         if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
+            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
         }
     }
 }

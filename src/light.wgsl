@@ -19,6 +19,8 @@ var<uniform> camera: Camera;
 
 struct ModelUniform {
     position: vec3<f32>;
+    worldpos: vec3<f32>;
+    model_offset: vec3<f32>;
 };
 [[group(2), binding(0)]]
 var<uniform> model_uniform: ModelUniform;
@@ -59,7 +61,7 @@ fn vs_main(
         instance.normal_matrix_2,
     );
     var out: VertexOutput;
-    var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position + model_uniform.position, 1.0);
+    var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position + model_uniform.position + model_uniform.model_offset, 1.0);
     out.clip_position = camera.view_proj * world_position;
     out.color = light_uniform.diffuse;
     return out;

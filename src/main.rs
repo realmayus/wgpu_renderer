@@ -3,8 +3,11 @@ extern crate core;
 use std::{env, fs};
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry::Occupied;
+use std::ops::Add;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use cgmath::prelude::*;
+use chrono::Duration;
 use egui::FontDefinitions;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
@@ -13,13 +16,16 @@ use log::{debug, log};
 use uuid::Uuid;
 use wgpu::BufferSize;
 use wgpu::util::DeviceExt;
-use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 use winit::window::Theme::Light;
 
+use ampel::Ampel;
+
+use crate::ampel::AmpelStatus;
 use crate::camera::{Camera, CameraController};
-use crate::model::{DrawModel, LightUniform, MaterialStructs, MaterialUniform, MeshUniform, Model, Vertex};
+use crate::model::{DrawModel, EmissiveMaterial, LightUniform, MaterialStructs, MaterialType, MaterialUniform, MeshUniform, Model, Vertex};
 use crate::world::{SceneItem, World};
 
 mod camera;
@@ -27,6 +33,7 @@ mod model;
 mod texture;
 mod util;
 mod world;
+mod ampel;
 
 struct Instance {
     position: cgmath::Vector3<f32>,
@@ -241,6 +248,14 @@ pub struct LightSourcePod {
     pub _padding: u32,
     pub worldpos: [f32; 3],
     pub _padding2: u32,
+    pub model_offset: [f32; 3],
+    pub _padding3: u32,
+    pub rot_mat_0: [f32; 3],
+    pub _padding4: u32,
+    pub rot_mat_1: [f32; 3],
+    pub _padding5: u32,
+    pub rot_mat_2: [f32; 3],
+    pub _padding6: u32,
 }
 
 struct State {
@@ -273,9 +288,13 @@ struct State {
     simple_uniform_layout: wgpu::BindGroupLayout,
     light_sources_buffer: wgpu::Buffer,
     light_sources_bind_group: wgpu::BindGroup,
-    info_buffer: wgpu::Buffer,
-    info_bind_group: wgpu::BindGroup,
     only_show_emissive: bool,
+    ampel_index: i32,
+    next_cycle: std::time::Duration,
+    green_duration: u32,
+    yellow_duration: u32,
+    red_yellow_duration: u32,
+    all_red_duration: u32,
 }
 
 impl State {
@@ -368,7 +387,7 @@ impl State {
         let camera_bind_group_layout = Camera::create_bind_group_layout(&device);
         let camera = Camera::new(&surface_config, &device, &camera_bind_group_layout);
 
-        let camera_controller = CameraController::new(0.2);
+        let camera_controller = CameraController::new(0.8);
 
         const SPACE_BETWEEN: f32 = 0.0;
         const NUM_INSTANCES_PER_ROW: i32 = 1;
@@ -421,7 +440,15 @@ impl State {
             position: [2.0, 2.0, 2.0],
             _padding: 0,
             worldpos: [0.0, 0.0, 0.0],
-            _padding1: 0
+            _padding1: 0,
+            model_offset: [0.0, 0.0, 0.0],
+            _padding2: 0,
+            rot_mat_0: [0.0, 0.0, 0.0],
+            _padding3: 0,
+            rot_mat_1: [0.0, 0.0, 0.0],
+            _padding4: 0,
+            rot_mat_2: [0.0, 0.0, 0.0],
+            _padding5: 0
         };
 
         let light_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -498,7 +525,7 @@ impl State {
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(80),
+                        min_binding_size: BufferSize::new(144),
                     },
                     count: None,
                 }],
@@ -576,12 +603,8 @@ impl State {
             &simple_uniform_layout,
             &simple_uniform_layout,
             res_dir.join("cube.obj"),
-            &mut MeshUniform {
-                position: [0.0, 0.0, 0.0],
-                _padding: 0,
-                worldpos: [0.0, 0.0, 0.0],
-                _padding1: 0,
-            },
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
             &String::from("6b761f1a-c88c-436c-8834-494a541e084c"),
         )
         .unwrap();
@@ -608,7 +631,15 @@ impl State {
                                 position: m.mesh_uniform.position,
                                 _padding: 0,
                                 worldpos: m.mesh_uniform.worldpos,
-                                _padding2: 0
+                                _padding2: 0,
+                                model_offset: m.mesh_uniform.model_offset,
+                                _padding3: 0,
+                                rot_mat_0: m.mesh_uniform.rot_mat_0,
+                                _padding4: 0,
+                                rot_mat_1: m.mesh_uniform.rot_mat_1,
+                                _padding5: 0,
+                                rot_mat_2: m.mesh_uniform.rot_mat_2,
+                                _padding6: 0,
                             });
                         },
                         _ => {}
@@ -682,38 +713,16 @@ impl State {
             simple_uniform_layout,
             light_sources_buffer,
             light_sources_bind_group,
-            info_buffer,
-            info_bind_group,
             only_show_emissive: false,
+            ampel_index: 0,
+            next_cycle: std::time::Duration::new(0, 0),
+            green_duration: 10,
+            yellow_duration: 5,
+            red_yellow_duration: 5,
+            all_red_duration: 5,
         }
     }
 
-
-    /*
-
-            for model in models.as_slice() {
-            for m in model.meshes.as_slice() {
-                // Populate light_sources
-
-                let mat_structs = &model.materials[m.material];
-                if m.material != 0 {  //TODO check if this works
-                    match mat_structs {
-                        MaterialStructs::EMISSION(mat) => {
-                            light_sources.push( LightSource {
-                                uniform: &mat.uniform,
-                                buffer: &mat.uniform_buffer,
-                                mesh_uniform: &m.mesh_uniform,
-                                mesh_buffer: &m.mesh_buffer,
-                            });
-                        },
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-
-     */
     fn load_world(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -728,6 +737,7 @@ impl State {
 
         let mut models = vec![];
         for m in world.scene.as_slice() {
+
             models.push(
                 model::Model::load(
                     device,
@@ -736,13 +746,10 @@ impl State {
                     model_bind_group_layout,
                     light_bind_group_layout,
                     res_dir.join(&m.model_file),
-                    &mut MeshUniform {
-                        position: m.position,
-                        _padding: 0,
-                        worldpos: [0.0, 0.0, 0.0],
-                        _padding1: 0,
-                    },
+                    m.position,
+                    m.rotation,
                     &m.id,
+
                 )
                 .expect(&*format!("Couldn't load model {}", &m.model_file)),
             );
@@ -772,7 +779,13 @@ impl State {
         self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self) {
+    fn find_model(models: &mut [Model], id: String) -> &mut Model {
+        models.iter_mut().filter(|m| m.id == Uuid::parse_str(&*id).unwrap()).next().unwrap()
+    }
+
+    // fn setAmpel()
+
+    fn update(&mut self, dt: std::time::Duration) {
         self.camera.update_view_proj();
         self.camera_controller.update_camera(&mut self.camera);
         self.queue.write_buffer(
@@ -781,9 +794,104 @@ impl State {
             bytemuck::cast_slice(&[self.camera.uniform]),
         );
 
-
-
         self.queue.write_buffer(&self.light_model.meshes[0].mesh_buffer, 0, bytemuck::cast_slice(&[self.light_model.meshes[0].mesh_uniform]));
+
+
+        if self.next_cycle > std::time::Duration::new(0, 0) && SystemTime::now().duration_since(UNIX_EPOCH).unwrap() > self.next_cycle
+        {
+            match self.ampel_index {
+                0 => {
+                    // All red
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    self.ampel_index = 1;
+                },
+                1 => {
+                    // red-yellow - red - red-yellow - red
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string())).unwrap().setStatus(AmpelStatus::REDYELLOW);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string())).unwrap().setStatus(AmpelStatus::REDYELLOW);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string())).unwrap().setStatus(AmpelStatus::RED);
+
+                    self.ampel_index = 2;
+                    self.next_cycle = SystemTime::now().add(std::time::Duration::new(self.red_yellow_duration as u64, 0)).duration_since(UNIX_EPOCH).unwrap()
+                },
+                2 => {
+                    // green - red - green - red
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string())).unwrap().setStatus(AmpelStatus::GREEN);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string())).unwrap().setStatus(AmpelStatus::GREEN);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string())).unwrap().setStatus(AmpelStatus::RED);
+
+                    self.ampel_index = 3;
+                    self.next_cycle = SystemTime::now().add(std::time::Duration::new(self.green_duration as u64, 0)).duration_since(UNIX_EPOCH).unwrap()
+                },
+                3 => {
+                    // yellow - red - yellow - red
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string())).unwrap().setStatus(AmpelStatus::YELLOW);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string())).unwrap().setStatus(AmpelStatus::YELLOW);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string())).unwrap().setStatus(AmpelStatus::RED);
+
+                    self.ampel_index = 4;
+                    self.next_cycle = SystemTime::now().add(std::time::Duration::new(self.yellow_duration as u64, 0)).duration_since(UNIX_EPOCH).unwrap()
+                },
+                4 => {
+                    // red - red - red - red
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string())).unwrap().setStatus(AmpelStatus::RED);
+
+                    self.ampel_index = 5;
+                    self.next_cycle = SystemTime::now().add(std::time::Duration::new(self.all_red_duration as u64, 0)).duration_since(UNIX_EPOCH).unwrap()
+                },
+                5 => {
+                    // red - red-yellow - red - red-yellow
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string())).unwrap().setStatus(AmpelStatus::REDYELLOW);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string())).unwrap().setStatus(AmpelStatus::REDYELLOW);
+
+                    self.ampel_index = 6;
+                    self.next_cycle = SystemTime::now().add(std::time::Duration::new(self.red_yellow_duration as u64, 0)).duration_since(UNIX_EPOCH).unwrap()
+                },
+                6 => {
+                    // red - green - red - green
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string())).unwrap().setStatus(AmpelStatus::GREEN);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string())).unwrap().setStatus(AmpelStatus::GREEN);
+
+                    self.ampel_index = 7;
+                    self.next_cycle = SystemTime::now().add(std::time::Duration::new(self.green_duration as u64, 0)).duration_since(UNIX_EPOCH).unwrap()
+                },
+                7 => {
+                    // red - yellow - red - yellow
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string())).unwrap().setStatus(AmpelStatus::YELLOW);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string())).unwrap().setStatus(AmpelStatus::YELLOW);
+
+                    self.ampel_index = 8;
+                    self.next_cycle = SystemTime::now().add(std::time::Duration::new(self.yellow_duration as u64, 0)).duration_since(UNIX_EPOCH).unwrap()
+                },
+                7 => {
+                    // red - red - red - red
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string())).unwrap().setStatus(AmpelStatus::RED);
+                    ampel::Ampel::fromModel(State::find_model(self.models.as_mut_slice(), "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string())).unwrap().setStatus(AmpelStatus::RED);
+
+                    self.ampel_index = 1;
+                    self.next_cycle = SystemTime::now().add(std::time::Duration::new(self.all_red_duration as u64, 0)).duration_since(UNIX_EPOCH).unwrap()
+                },
+                _ => {}
+            }
+        }
+
 
         match &self.light_model.materials[0] {
             MaterialStructs::EMISSION(mat) => {
@@ -795,34 +903,38 @@ impl State {
         let mut light_sources: Vec<LightSourcePod> = vec![];
         for model in self.models.as_mut_slice() {
             for m in model.meshes.as_mut_slice() {
+                m.mesh_uniform.model_offset = model.model_offset;
                 self.queue
                     .write_buffer(&m.mesh_buffer, 0, bytemuck::cast_slice(&[m.mesh_uniform]));
 
                 // Populate light_sources
                 let mat_structs = &model.materials[m.material];
-                // if m.material != 0 {  //TODO check if this works
-                    match mat_structs {
-                        MaterialStructs::EMISSION(mat) => {
-                            light_sources.push( LightSourcePod {
-                                ambient: mat.uniform.ambient,
-                                constant: mat.uniform.constant,
-                                diffuse: mat.uniform.diffuse,
-                                linear: mat.uniform.linear,
-                                specular: mat.uniform.specular,
-                                quadratic: mat.uniform.quadratic,
-                                position: m.mesh_uniform.position,
-                                _padding: 0,
-                                worldpos: m.mesh_uniform.worldpos,
-                                _padding2: 0,
-                            });
-                        },
-                        _ => {}
-                    }
-                //}
-
+                match mat_structs {
+                    MaterialStructs::EMISSION(mat) => {
+                        light_sources.push( LightSourcePod {
+                            ambient: mat.uniform.ambient,
+                            constant: mat.uniform.constant,
+                            diffuse: mat.uniform.diffuse,
+                            linear: mat.uniform.linear,
+                            specular: mat.uniform.specular,
+                            quadratic: mat.uniform.quadratic,
+                            position: m.mesh_uniform.position,
+                            _padding: 0,
+                            worldpos: m.mesh_uniform.worldpos,
+                            _padding2: 0,
+                            model_offset: m.mesh_uniform.model_offset,
+                            _padding3: 0,
+                            rot_mat_0: m.mesh_uniform.rot_mat_0,
+                            _padding4: 0,
+                            rot_mat_1: m.mesh_uniform.rot_mat_1,
+                            _padding5: 0,
+                            rot_mat_2: m.mesh_uniform.rot_mat_2,
+                            _padding6: 0,
+                        });
+                    },
+                    _ => {}
+                }
             }
-
-            println!("Found {} light sources.", light_sources.len());
 
             self.queue.write_buffer(&self.light_sources_buffer, 0, bytemuck::cast_slice(&light_sources));
 
@@ -882,15 +994,12 @@ impl State {
 
                 render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
 
-                // render_pass.draw_model(&self.light_model, &self.camera.bind_group, &self.render_pipeline, &self.light_render_pipeline, &self.light_sources_bind_group, &self.info_bind_group);
-
                 for m in self.models.as_slice() {
-                    render_pass.draw_model(&m, &self.camera.bind_group, &self.render_pipeline, &self.light_render_pipeline, &self.light_sources_bind_group, &self.info_bind_group, self.only_show_emissive);
+                    render_pass.draw_model(&m, &self.camera.bind_group, &self.render_pipeline, &self.light_render_pipeline, &self.light_sources_bind_group, self.only_show_emissive);
                 }
 
             }
 
-            // submit will accept anything that implements IntoIter
             self.queue.submit(std::iter::once(encoder.finish()));
 
             self.platform.begin_frame();
@@ -951,18 +1060,13 @@ impl State {
 
     fn draw_gui(&mut self) {
         egui::Window::new("Settings").show(&self.platform.context(), |ui| {
-            ui.add(egui::Slider::new(&mut self.light_angle, 0.0..=360.0).text("Light angle"));
-            ui.checkbox(&mut self.auto_rotate_light, "Auto rotate light");
             ui.label("Clear color");
             ui.color_edit_button_rgb(&mut self.clear_color);
-            ui.label("Light color");
-            ui.color_edit_button_rgb(&mut self.light_uniform.diffuse_color);
             ui.checkbox(&mut self.only_show_emissive, "Only show emissive materials");
             if ui.button("Reset Camera").clicked() {
                 self.camera.eye = [0.0f32, 1.0f32, 2.0f32].into();
             }
             if ui.button("Reload world").clicked() {
-                // TODO: Remove buffers, bind groups etc?
                 let (world, models) = State::load_world(
                     &self.device,
                     &self.queue,
@@ -978,9 +1082,8 @@ impl State {
                     for i in self.world.scene.as_mut_slice() {
                         if Uuid::parse_str(&i.id).unwrap() == m.id {
                             println!("Saved model #{:?}", m.id);
-                            for mesh in m.meshes.as_slice() {
-                                i.position = mesh.mesh_uniform.position;
-                            }
+                            i.position = m.model_offset;
+                            i.rotation = m.model_rot;
                         }
                     }
                 }
@@ -992,21 +1095,105 @@ impl State {
                 .expect("Couldn't write to file")
             }
 
-            if ui.button("Add model file").clicked() {
-                let path = std::env::current_dir().unwrap().join("res");
-                let res = rfd::FileDialog::new()
-                    .add_filter("models", &["obj"])
-                    .set_directory(&path)
-                    .pick_file();
-                println!("The user chose: {:#?}", res);
+            ui.separator();
+            ui.add(
+                egui::Slider::new(
+                    &mut self.green_duration,
+                    1u32..=20u32,
+                )
+                    .clamp_to_range(true)
+                    .text("Green duration"),
+            );
+            ui.add(
+                egui::Slider::new(
+                    &mut self.yellow_duration,
+                    1u32..=20u32,
+                )
+                    .clamp_to_range(true)
+                    .text("Yellow duration"),
+            );
+            ui.add(
+                egui::Slider::new(
+                    &mut self.red_yellow_duration,
+                    1u32..=20u32,
+                )
+                    .clamp_to_range(true)
+                    .text("Red-Yellow duration"),
+            );
+            ui.add(
+                egui::Slider::new(
+                    &mut self.all_red_duration,
+                    1u32..=20u32,
+                )
+                    .clamp_to_range(true)
+                    .text("All-red duration"),
+            );
+            ui.label("Next cycle:");
+            ui.label(format!("{}", self.next_cycle.as_secs()));
+            if ui.button("Start / Stop").clicked() {
+                if self.next_cycle > std::time::Duration::new(0, 0) {
+                    self.next_cycle = std::time::Duration::new(0, 0);
+                } else {
+                    self.next_cycle = std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                }
             }
         });
         egui::Window::new("Scene").show(&self.platform.context(), |ui| {
             for scene_item in self.world.scene.as_slice() {
                 egui::CollapsingHeader::new(&scene_item.name).show(ui, |ui| {
                     let model_ref = State::map_scene_item_to_model(&mut self.models, scene_item);
-                    egui::CollapsingHeader::new("All Meshes").show(ui, |ui| {
+                    egui::CollapsingHeader::new("Model").show(ui, |ui| {
                         ui.label("Position");
+                        ui.add(
+                            egui::Slider::new(
+                                &mut model_ref.model_offset[0],
+                                -20.0..=20.0,
+                            )
+                                .clamp_to_range(false)
+                                .text("x"),
+                        );
+                        ui.add(
+                            egui::Slider::new(
+                                &mut model_ref.model_offset[1],
+                                -20.0..=20.0,
+                            )
+                                .clamp_to_range(false)
+                                .text("y"),
+                        );
+                        ui.add(
+                            egui::Slider::new(
+                                &mut model_ref.model_offset[2],
+                                -20.0..=20.0,
+                            )
+                                .clamp_to_range(false)
+                                .text("z"),
+                        );
+                        ui.label("Rotation");
+                        ui.add(
+                            egui::Slider::new(
+                                &mut model_ref.model_rot[0],
+                                0.0..=360.0,
+                            )
+                                .clamp_to_range(false)
+                                .text("x"),
+                        );
+                        ui.add(
+                            egui::Slider::new(
+                                &mut model_ref.model_rot[1],
+                                0.0..=360.0,
+                            )
+                                .clamp_to_range(false)
+                                .text("y"),
+                        );
+                        ui.add(
+                            egui::Slider::new(
+                                &mut model_ref.model_rot[2],
+                                0.0..=360.0,
+                            )
+                                .clamp_to_range(false)
+                                .text("z"),
+                        );
+
                     });
                     let mut mesh_id = 0;
                     for mesh in model_ref.meshes.as_mut_slice() {
@@ -1078,10 +1265,10 @@ fn main() {
         .expect("Can't open window");
 
     let mut state = pollster::block_on(State::new(window));
-
+    let mut last_render_time = std::time::Instant::now();  // NEW!
     event_loop.run(move |event, _, control_flow| {
         state.platform.handle_event(&event);
-
+        *control_flow = ControlFlow::Poll;
         match event {
             Event::WindowEvent {
                 ref event,
@@ -1107,7 +1294,6 @@ fn main() {
                             state.resize(*physical_size);
                         }
                         WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                            // new_inner_size is &&mut so we have to dereference it twice
                             state.resize(**new_inner_size);
                         }
                         _ => {}
@@ -1115,7 +1301,10 @@ fn main() {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == state.window.id() => {
-                state.update();
+                let now = std::time::Instant::now();
+                let dt = now - last_render_time;
+                last_render_time = now;
+                state.update(dt);
                 match state.render() {
                     Ok(_) => {}
                     // Reconfigure the surface if lost

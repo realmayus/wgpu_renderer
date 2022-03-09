@@ -1,11 +1,14 @@
+use std::f32::consts::PI;
 use anyhow::*;
-use std::ops::Range;
+use std::ops::{Mul, Range};
 use std::path::Path;
+use cgmath::{Matrix4, Rotation3};
 use tobj::LoadOptions;
 use uuid::Uuid;
+use wgpu::{BindGroupLayout, Device, Queue};
 use wgpu::util::DeviceExt;
 
-use crate::{LightSource, texture};
+use crate::{LightSource, quat_mul, texture};
 
 pub trait Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
@@ -98,6 +101,14 @@ pub struct MeshUniform {
     pub _padding: u32,
     pub worldpos: [f32; 3],
     pub _padding1: u32,
+    pub model_offset: [f32; 3],
+    pub _padding2: u32,
+    pub rot_mat_0: [f32; 3],
+    pub _padding3: u32,
+    pub rot_mat_1: [f32; 3],
+    pub _padding4: u32,
+    pub rot_mat_2: [f32; 3],
+    pub _padding5: u32,
 }
 
 pub struct Mesh {
@@ -115,6 +126,8 @@ pub struct Model {
     pub id: Uuid,
     pub meshes: Vec<Mesh>,
     pub materials: Vec<MaterialStructs>,
+    pub model_offset: [f32; 3],
+    pub model_rot: [f32; 3],
 }
 
 impl Model {
@@ -125,7 +138,8 @@ impl Model {
         mesh_layout: &wgpu::BindGroupLayout,
         light_layout: &wgpu::BindGroupLayout,
         path: P,
-        mesh_uniform: &mut MeshUniform,
+        model_offset: [f32; 3],
+        model_rot: [f32; 3],
         id: &String,
     ) -> Result<Self> {
         let obj_uuid =
@@ -280,11 +294,29 @@ impl Model {
             y = y / (m.mesh.positions.len() / 3) as f32;
             z = z / (m.mesh.positions.len() / 3) as f32;
 
+            let mut rot_mat = glam::Mat3::from_rotation_x(model_rot[0] * (PI/180.0));
+            rot_mat = rot_mat.mul(glam::Mat3::from_rotation_y(model_rot[1] * (PI/180.0)));
+            rot_mat = rot_mat.mul(glam::Mat3::from_rotation_z(model_rot[2] * (PI/180.0)));
+
+            for mut v in vertices.as_mut_slice() {
+                v.position = rot_mat.mul(glam::Vec3::from(v.position)).into();
+            }
+
+
             let uniform = MeshUniform {
                 position: [0.0, 0.0, 0.0],
                 _padding: 0,
                 worldpos: [x, y, z],
-                _padding1: 0
+                _padding1: 0,
+                model_offset: [0.0, 0.0, 0.0],
+                _padding2: 0,
+
+                rot_mat_0: rot_mat.x_axis.into(),
+                _padding3: 0,
+                rot_mat_1: rot_mat.y_axis.into(),
+                _padding4: 0,
+                rot_mat_2: rot_mat.z_axis.into(),
+                _padding5: 0
             };
 
             let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -347,6 +379,8 @@ impl Model {
             id: obj_uuid,
             meshes,
             materials,
+            model_offset,
+            model_rot,
         })
     }
 }
@@ -358,7 +392,6 @@ pub trait DrawModel<'a> {
         material: &'a MaterialStructs,
         camera_bind_group: &'a wgpu::BindGroup,
         light_sources_bind_group: &'a wgpu::BindGroup,
-        scene_info_bind_group: &'a wgpu::BindGroup,
         only_show_emissive: bool,
     );
     fn draw_mesh_instanced(
@@ -368,7 +401,6 @@ pub trait DrawModel<'a> {
         instances: Range<u32>,
         camera_bind_group: &'a wgpu::BindGroup,
         light_sources_bind_group: &'a wgpu::BindGroup,
-        scene_info_bind_group: &'a wgpu::BindGroup,
         only_show_emissive: bool,
     );
 
@@ -379,7 +411,6 @@ pub trait DrawModel<'a> {
         render_pipeline: &'a wgpu::RenderPipeline,
         light_render_pipeline: &'a wgpu::RenderPipeline,
         light_sources_bind_group: &'a wgpu::BindGroup,
-        scene_info_bind_group: &'a wgpu::BindGroup,
         only_show_emissive: bool,
     );
     fn draw_model_instanced(
@@ -390,7 +421,6 @@ pub trait DrawModel<'a> {
         light_sources_bind_group: &'a wgpu::BindGroup,
         render_pipeline: &'a wgpu::RenderPipeline,
         light_render_pipeline: &'a wgpu::RenderPipeline,
-        scene_info_bind_group: &'a wgpu::BindGroup,
         only_show_emissive: bool,
     );
 }
@@ -405,10 +435,9 @@ where
         material: &'b MaterialStructs,
         camera_bind_group: &'b wgpu::BindGroup,
         light_sources_bind_group: &'b wgpu::BindGroup,
-        scene_info_bind_group: &'b wgpu::BindGroup,
         only_show_emissive: bool,
     ) {
-        self.draw_mesh_instanced(mesh, material, 0..1, camera_bind_group, light_sources_bind_group, scene_info_bind_group, only_show_emissive);
+        self.draw_mesh_instanced(mesh, material, 0..1, camera_bind_group, light_sources_bind_group, only_show_emissive);
     }
 
     fn draw_mesh_instanced(
@@ -418,7 +447,6 @@ where
         instances: Range<u32>,
         camera_bind_group: &'b wgpu::BindGroup,
         light_sources_bind_group: &'b wgpu::BindGroup,
-        scene_info_bind_group: &'b wgpu::BindGroup,
         only_show_emissive: bool,
     ) {
         self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
@@ -450,10 +478,9 @@ where
         render_pipeline: &'b wgpu::RenderPipeline,
         light_render_pipeline: &'b wgpu::RenderPipeline,
         light_sources_bind_group: &'b wgpu::BindGroup,
-        scene_info_bind_group: &'b wgpu::BindGroup,
         only_show_emissive: bool,
     ) {
-        self.draw_model_instanced(model, 0..1, camera_bind_group, light_sources_bind_group, render_pipeline, light_render_pipeline, scene_info_bind_group, only_show_emissive);
+        self.draw_model_instanced(model, 0..1, camera_bind_group, light_sources_bind_group, render_pipeline, light_render_pipeline, only_show_emissive);
     }
 
     fn draw_model_instanced(
@@ -464,17 +491,14 @@ where
         light_sources_bind_group: &'b wgpu::BindGroup,
         render_pipeline: &'b wgpu::RenderPipeline,
         light_render_pipeline: &'b wgpu::RenderPipeline,
-        scene_info_bind_group: &'b wgpu::BindGroup,
         only_show_emissive: bool,
     ) {
         for mesh in &model.meshes {
             let material = &model.materials[mesh.material];
             match material {
                 MaterialStructs::EMISSION(mat) => {
-                    println!("Using light render pipeline for {}", mat.name);
                     self.set_pipeline(light_render_pipeline) },
                 MaterialStructs::DIFFUSE(mat) => {
-                    println!("Using normal render pipeline for {}", mat.name);
                     self.set_pipeline(render_pipeline) },
             }
             self.draw_mesh_instanced(
@@ -483,8 +507,7 @@ where
                 instances.clone(),
                 camera_bind_group,
                 light_sources_bind_group,
-                scene_info_bind_group,
-                only_show_emissive
+                only_show_emissive,
             );
         }
     }

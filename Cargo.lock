@@ -701,6 +701,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4fa84eead97d5412b2a20aed4d66612a97a9e41e08eababdb9ae2bf88667490"
+
+[[package]]
 name = "glib-sys"
 version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1978,6 +1984,7 @@ dependencies = [
  "env_logger",
  "epi",
  "fs_extra",
+ "glam",
  "glob",
  "image",
  "log",

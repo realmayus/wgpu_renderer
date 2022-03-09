@@ -25,6 +25,7 @@ toml = "0.5.8"
 chrono = "0.4.19"
 serde = { version = "1.0.136", features = ["derive"] }
 uuid = { version = "0.8.2", features = ["v4"] }
+glam = "0.20.2"
 
 [build-dependencies]
 anyhow = "1.0.55"
