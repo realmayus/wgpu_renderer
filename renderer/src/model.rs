@@ -2,13 +2,11 @@ use std::f32::consts::PI;
 use anyhow::*;
 use std::ops::{Mul, Range};
 use std::path::Path;
-use cgmath::{Matrix4, Rotation3};
 use tobj::LoadOptions;
 use uuid::Uuid;
-use wgpu::{BindGroupLayout, Device, Queue};
 use wgpu::util::DeviceExt;
 
-use crate::{LightSource, quat_mul, texture};
+use crate::{texture};
 
 pub trait Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
@@ -169,7 +167,6 @@ impl Model {
                 "Ampel.Rot" | "Ampel.Gelb" | "Ampel.Gruen" => {
                     println!("Added light mesh");
                     mat_type = MaterialType::EMISSION;
-                    diffuse_texture = texture::Texture::load(device, queue, containing_folder.join("solid_white.png"))?;
 
                     let uniform = LightUniform {
                         ambient: mat.ambient,
@@ -496,9 +493,9 @@ where
         for mesh in &model.meshes {
             let material = &model.materials[mesh.material];
             match material {
-                MaterialStructs::EMISSION(mat) => {
+                MaterialStructs::EMISSION(_mat) => {
                     self.set_pipeline(light_render_pipeline) },
-                MaterialStructs::DIFFUSE(mat) => {
+                MaterialStructs::DIFFUSE(_mat) => {
                     self.set_pipeline(render_pipeline) },
             }
             self.draw_mesh_instanced(

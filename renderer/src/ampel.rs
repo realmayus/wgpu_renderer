@@ -1,6 +1,5 @@
-use std::convert::Infallible;
-use crate::{MaterialStructs, Model, model};
-use crate::model::{EmissiveMaterial, MaterialType};
+use crate::{MaterialStructs, Model};
+use crate::model::{EmissiveMaterial};
 
 pub enum AmpelStatus {
     RED,
@@ -16,7 +15,7 @@ pub(crate) struct Ampel<'a> {
 }
 
 impl<'a> Ampel<'a> {
-    pub(crate) fn fromModel(model: &'a mut Model) -> Option<Ampel<'a>> {
+    pub(crate) fn from_model(model: &'a mut Model) -> Option<Ampel<'a>> {
         let mut mat_red: Option<&mut EmissiveMaterial> = None;
         let mut mat_yellow: Option<&mut EmissiveMaterial> = None;
         let mut mat_green: Option<&mut EmissiveMaterial> = None;
@@ -40,7 +39,7 @@ impl<'a> Ampel<'a> {
         })
     }
 
-    pub fn setStatus(&mut self, status: AmpelStatus) {
+    pub fn set_status(&mut self, status: AmpelStatus) {
         match status {
             AmpelStatus::RED => {
                 self.mat_red.as_mut().map(|mut s| {s.uniform.quadratic = 0.032; s});

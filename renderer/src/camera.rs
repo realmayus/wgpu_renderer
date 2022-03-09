@@ -1,5 +1,4 @@
 use crate::util;
-use crate::util::OPENGL_TO_WGPU_MATRIX;
 use cgmath::SquareMatrix;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroup, BindGroupLayout, Buffer, Device};
@@ -90,10 +89,6 @@ impl Camera {
     pub(crate) fn update_view_proj(&mut self) {
         self.uniform.view_proj = self.build_view_projection_matrix().into();
     }
-
-    pub(crate) fn get_uniform(self) -> CameraUniform {
-        self.uniform
-    }
 }
 
 #[repr(C)]
@@ -109,12 +104,6 @@ impl CameraUniform {
             view_position: [0.0; 4],
             view_proj: cgmath::Matrix4::identity().into(),
         }
-    }
-
-    fn update_view_proj(&mut self, camera: &Camera) {
-        // We're using Vector4 because of the uniforms 16 byte spacing requirement
-        self.view_position = camera.eye.to_homogeneous().into();
-        self.view_proj = (OPENGL_TO_WGPU_MATRIX * camera.build_view_projection_matrix()).into();
     }
 }
 
