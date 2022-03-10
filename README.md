@@ -8,6 +8,9 @@ Hier kann das Programm kompiliert heruntergeladen werden: [Download (Windows)](h
 ## Grundlagen
 ### Wichtig
 Ich habe hier versucht, die Grundideen in meinem Programm etwas zu erläutern. Da es aber sehr komplex ist, ist es schwer, hier alles zu berücksichtigen. Vor allem kann ich Ihnen in der nächsten Stunde auch den Code näher erklären (Rust als Programmiersprache hat einige interessante Eigenschaften). Falls jedoch Fragen bestehen, können Sie mir gerne eine Email schreiben.
+
+### Rust
+Der Renderer wurde in der Programmiersprache Rust entwickelt. Rust ist so nah an der Hardware wie z. B. C++, ist aber deutlich ergonomischer in der Handhabung und gewährleistet Memory Safety, d.h. dass es schlichtweg unmöglich ist, einen bereits vom Arbeitsspeicher gelöschten Wert zu lesen. Dadurch werden viele Fehler verhindert und können überhaupt nicht auftreten.
 ### Renderer
 Der Renderer wurde ohne jegliche vorgefertigte Softwarebibliotheken programmiert - einzig die Abstraktionsebene `wgpu` wird verwendet, um plattformübergreifende Kompatibilität zu gewährleisten. `wgpu` bildet einen Draht zu den nativen GPU-APIs der jeweiligen Plattform, so wird auf Linux bspw. OpenGL bzw. Vulkan als Implementierung verwendet und auf Windows DirectX.
 
@@ -46,9 +49,12 @@ Dabei ist nicht die Lichtquelle für die Farbveränderung auf einem benachbarten
 
 Dabei besteht die Reflektion aus drei Teilen: Ambient, Diffuse und Specular. Ambient ist eine Annäherung an die Tatsache, dass Lichtstrahlen unendlich oft an Objekten in der Realität abprallen - selbst im Schatten ist es nie vollständig schwarz. Deshalb gibt man einem Objekt eine dunkle Grundfarbe. Diffuse bezeichnet den Teil des Lichts, der vom Objekt reflektiert wird. Dabei kommt es bei der Stärke auf den Winkel zur Lichtquelle an. Specular bezeichnet die spiegelnde Lichtkomponente. Diese wird in Abhängigkeit zur Kamera, also zum Betrachter, berechnet. 
 
-Die Lampen selbst werden übrigens mit einem anderen Shader in [light.wgsl](/renderer/src/light.wgsl) gerendert, da diese nicht von anderen Lampen bzw. Schatten beeinflusst werden sollen, schließlich leuchten sie.
+Die Lampen selbst werden übrigens mit einem anderen Shader in [light.wgsl](/renderer/src/light.wgsl) gerendert, da diese von allen Winkeln aus die volle Farbe haben sollen - schließlich leuchten sie.
 
-## Konfiguration
+## Dateistruktur
+Der Code liegt in [renderer/src](renderer/src). Die Ressourcen, die vom Programm geladen werden, liegen in [renderer/res](renderer/res) (Model-Dateien, Materials, Texturen usw.)
+### Konfigurationsdatei
+
 Die Szene beim Start des Programms deserialisiert aus der Datei [world.toml](/renderer/res/world.toml). Hier werden Informationen über alle Modelle in der Szene gespeichert, so z.B. der Name eines Modells, eine einzigartige ID, die Position in der Szene, die Rotation und der Pfad zur OBJ-Datei.
 
 Beim Klick auf *Save world* wird die sich im Arbeitsspeicher befindliche Welt serialisiert und in die Datei geschrieben.
