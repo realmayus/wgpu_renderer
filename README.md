@@ -5,6 +5,10 @@
 ## Download
 Hier kann das Programm kompiliert heruntergeladen werden: [Download (Windows)](https://github.com/realmayus/wgpu_renderer/raw/master/renderer.zip)
 
+Es ist wichtig, dass das Programm mit derselben Ordnerstruktur wie in der Zip-Datei entpackt wird. D.h. im selben Verzeichnis wie die EXE-Datei muss der Ordner `res` liegen. Das Programm benutzt relative Pfade beim Laden der Ressourcen und nur so kann gewährleistet werden, dass die benötigten Dateien gefunden werden.
+
+Falls sich das Programm direkt wieder schließt, kann es sein, dass ein Fehler aufgetreten ist. Diesen kann man sich anzeigen lassen, indem man das Programm durch die Kommandozeile öffnet. Dazu einfach mit dem Terminal in den Ordner der EXE-Datei springen und die EXE übers Terminal ausführen. Dann sollte in der Konsole ein Fehler angezeigt werden.
+
 ## Grundlagen
 ### Wichtig
 Ich habe hier versucht, die Grundideen in meinem Programm etwas zu erläutern. Da es aber sehr komplex ist, ist es schwer, hier alles zu berücksichtigen. Vor allem kann ich Ihnen in der nächsten Stunde auch den Code näher erklären (Rust als Programmiersprache hat einige interessante Eigenschaften). Falls jedoch Fragen bestehen, können Sie mir gerne eine Email schreiben.
