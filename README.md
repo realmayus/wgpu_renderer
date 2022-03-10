@@ -6,6 +6,8 @@
 Hier kann das Programm kompiliert heruntergeladen werden: [Download (Windows)](https://github.com/realmayus/wgpu_renderer/raw/master/renderer.zip)
 
 ## Grundlagen
+### Wichtig
+Ich habe hier versucht, die Grundideen in meinem Programm etwas zu erläutern. Da es aber sehr komplex ist, ist es schwer, hier alles zu berücksichtigen. Vor allem kann ich Ihnen in der nächsten Stunde auch den Code näher erklären (Rust als Programmiersprache hat einige interessante Eigenschaften). Falls jedoch Fragen bestehen, können Sie mir gerne eine Email schreiben.
 ### Renderer
 Der Renderer wurde ohne jegliche vorgefertigte Softwarebibliotheken programmiert - einzig die Abstraktionsebene `wgpu` wird verwendet, um plattformübergreifende Kompatibilität zu gewährleisten. `wgpu` bildet einen Draht zu den nativen GPU-APIs der jeweiligen Plattform, so wird auf Linux bspw. OpenGL bzw. Vulkan als Implementierung verwendet und auf Windows DirectX.
 
