@@ -92,3 +92,54 @@ Die nachfolgenden Reiter bieten Einstellmöglichkeiten für die im Model enthalt
 
 Durch einen Klick auf **Start / Stop** lässt sich die Ampelsteuerung starten. Durch die Reflektion der Ampellichter auf der Straße ist die derzeitige Ampelphase aus jedem Winkel erkennbar, aber mit <kbd>A</kbd> bzw. <kbd>D</kbd> kann die Kreuzung unter allen Winkeln betrachtet werden.
 
+Die Ampelsteuerung liegt in der Funktion `update()`, die bei jedem Renderdurchgang, also bei jedem Frame, ausgeführt wird. Als Klassenattribut wird ein Ampel-Index (`ampel_index`) sowie ein Zeitpunkt gespeichert, bei dem in die nächste Phase übergegangen werden soll (`next_cycle`).
+
+```rs
+        if SystemTime::now().duration_since(UNIX_EPOCH).unwrap() > self.next_cycle {
+```
+Bei jedem Frame wird hier gecheckt, ob sich die derzeitige Systemzeit nach dem definierten `next_cycle` befindet. Falls dies der Fall ist, also ein Phasenübergang überfällig ist, werden anhand des `ampel_index` die Ampeln umgeschaltet:
+
+```rs
+                    State::set_ampel_status(
+                        State::find_model(
+                            self.models.as_mut_slice(),
+                            "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string(),
+                        ),
+                        AmpelStatus::RED,
+                    );
+```
+Das Ampel-Model wird anhand einer UUID (universally unique identifier) im Programm identifiziert und dessen Materials werden so verändert, dass es aussieht, als würden z.B. die gelbe und die rote Lampe ausgeschaltet, und die Grüne eingeschaltet sein:
+```rs
+        match status {
+            AmpelStatus::RED => {
+                mat_red.as_mut().map(|mut s| {
+                    s.uniform.quadratic = 0.032;
+                    s
+                });
+                mat_red.as_mut().map(|mut s| {
+                    s.uniform.diffuse = [0.8, 0.0, 0.011073];
+                    s
+                });
+                mat_yellow.as_mut().map(|mut s| {
+                    s.uniform.quadratic = 100.0;
+                    s
+                });
+                mat_yellow.as_mut().map(|mut s| {
+                    s.uniform.diffuse = [0.033, 0.031, 0.004];
+                    s
+                });
+                mat_green.as_mut().map(|mut s| {
+                    s.uniform.quadratic = 100.0;
+                    s
+                });
+                mat_green.as_mut().map(|mut s| {
+                    s.uniform.diffuse = [0.002, 0.027, 0.002];
+                    s
+                });
+            }
+```
+
+Dabei sind immer zwei gegenüberliegende Ampeln gekoppelt und sind in der gleichen Phase.
+Die Phasenlängen sind über die Slider im GUI einstellbar.
+Damit ein Start/Stop-Button implementiert werden konnte, wurde zudem ein Ampelindex `-1`eingeführt. Wenn dieser Index aktiv ist, werden alle Ampeln auf Rot gestellt, aber im Gegensatz zu anderen Indizes wird kein nachfolgender Index bestimmt. Beim Klick auf Start/Stop wird Index `0` aktiv, der ebenfalls alle Ampeln auf Rot setzt, jedoch einen Wert für `next_cycle` definiert und auch den nächsten Index auf `1` setzt.
+Wenn die Schaltung gestoppt wird, wird wieder der Ampelindex `-1` gesetzt.
