@@ -3,15 +3,24 @@
 ![Screen Shot 2022-03-09 at 23 25 04](https://user-images.githubusercontent.com/38134006/157552898-5c21b137-e1cf-4140-8ad6-9c41ce231fc6.png)
 
 ## Download
-Hier kann das Programm kompiliert heruntergeladen werden: <LINK
+Hier kann das Programm kompiliert heruntergeladen werden: [Download (Windows)](https://github.com/realmayus/wgpu_renderer/raw/master/renderer.zip)
+
+Es ist wichtig, dass das Programm mit derselben Ordnerstruktur wie in der Zip-Datei entpackt wird. D.h. im selben Verzeichnis wie die EXE-Datei muss der Ordner `res` liegen. Das Programm benutzt relative Pfade beim Laden der Ressourcen und nur so kann gewährleistet werden, dass die benötigten Dateien gefunden werden.
+
+Falls sich das Programm direkt wieder schließt, kann es sein, dass ein Fehler aufgetreten ist. Diesen kann man sich anzeigen lassen, indem man das Programm durch die Kommandozeile öffnet. Dazu einfach mit dem Terminal in den Ordner der EXE-Datei springen und die EXE übers Terminal ausführen. Dann sollte in der Konsole ein Fehler angezeigt werden.
 
 ## Grundlagen
+### Wichtig
+Ich habe hier versucht, die Grundideen in meinem Programm etwas zu erläutern. Da es aber sehr komplex ist, ist es schwer, hier alles zu berücksichtigen. Vor allem kann ich Ihnen in der nächsten Stunde auch den Code näher erklären (Rust als Programmiersprache hat einige interessante Eigenschaften). Falls jedoch Fragen bestehen, können Sie mir gerne eine Email schreiben.
+
+### Rust
+Der Renderer wurde in der Programmiersprache Rust entwickelt. Rust ist so nah an der Hardware wie z. B. C++, ist aber deutlich ergonomischer in der Handhabung und gewährleistet Memory Safety, d.h. dass es schlichtweg unmöglich ist, einen bereits vom Arbeitsspeicher gelöschten Wert zu lesen. Dadurch werden viele Fehler verhindert und können überhaupt nicht auftreten.
 ### Renderer
 Der Renderer wurde ohne jegliche vorgefertigte Softwarebibliotheken programmiert - einzig die Abstraktionsebene `wgpu` wird verwendet, um plattformübergreifende Kompatibilität zu gewährleisten. `wgpu` bildet einen Draht zu den nativen GPU-APIs der jeweiligen Plattform, so wird auf Linux bspw. OpenGL bzw. Vulkan als Implementierung verwendet und auf Windows DirectX.
 
 Beim Umgang mit Grafik-Hardware sind sog. Buffers zentral. Sie sind kleine Abschnitte im Arbeitsspeicher von Grafikkarten. Ein Programm kann solche Buffers reservieren und Daten an sie senden. Dabei werden die Buffers bei jedem Renderdurchgang (d.h. bei jedem Frame) überschrieben und müssen vom Programm neu versandt werden.
 
-Auf der GPU läuft ebenfalls Code - in Form von sog. Shadern. Ein Shader ist ein sehr kleines, hoch parallelisierbares Programm, das das eigentliche 3D-Modell auf den Bildschirm zeichnet. Dabei sind vor allem zwei Arten von Shadern im Einsatz: Vertex Shader und Fragment Shader (es wird also ein Shader pro Fragment ausgeführt). Erstere sind für die Positionierung der Vertices verantwortlich (z.B. können hier Vertices gedreht, skaliert, verzerrt usw. werden), letztere für das Berechnen der Farbe eines *Fragments* (meist ein Pixel groß).
+Auf der GPU läuft ebenfalls Code - in Form von sog. Shadern. Ein Shader ist ein sehr kleines, hoch parallelisierbares Programm, das das eigentliche 3D-Modell auf den Bildschirm zeichnet. Dabei sind vor allem zwei Arten von Shadern im Einsatz: Vertex Shader und Fragment Shader (es wird also ein Shader pro Fragment ausgeführt). Erstere sind für die Positionierung der Vertices verantwortlich (z.B. können hier Vertices gedreht, skaliert, verzerrt usw. werden), letztere für das Berechnen der Farbe eines *Fragments* (min. ein Pixel groß).
 In den Shadern können dann die Daten, die in den Buffers gespeichert werden, verarbeitet werden. So lässt sich beispielsweise die Farbe eines Objekts jeden Frame ändern, indem in jedem Renderdurchgang der Buffer auf der Grafikkarte verändert und anhand der übermittelten Daten die Farbe des jeweiligen Fragments verändert wird.
 
 Ein Buffer hat eine Adresse, einen Pointer, die sog. BindGroup. BindGroups sind von Nöten, um vom CPU-seitigen Code Buffers an die GPU zu senden. Meherere BindGroups können Teil einer *RenderPipeline* sein - diese fasst alle Eigenschaften und Übertragungsmethoden eines Shaders zusammen und lässt sich spontan austauschen, bspw. um den Shader zu wechseln. Beim Übertragen von Daten an die GPU ist es zudem wichtig, bestimmte Memory Alignment-Regeln einzuhalten. Nur, wenn ein bestimmter Abstand zwischen bestimmten Datentypen in einem Uniform (Übertragungsmittel an den Shader) gewährleistet ist, kann die GPU ihren Arbeitsspeicherhaushalt optimisieren.
@@ -44,9 +53,12 @@ Dabei ist nicht die Lichtquelle für die Farbveränderung auf einem benachbarten
 
 Dabei besteht die Reflektion aus drei Teilen: Ambient, Diffuse und Specular. Ambient ist eine Annäherung an die Tatsache, dass Lichtstrahlen unendlich oft an Objekten in der Realität abprallen - selbst im Schatten ist es nie vollständig schwarz. Deshalb gibt man einem Objekt eine dunkle Grundfarbe. Diffuse bezeichnet den Teil des Lichts, der vom Objekt reflektiert wird. Dabei kommt es bei der Stärke auf den Winkel zur Lichtquelle an. Specular bezeichnet die spiegelnde Lichtkomponente. Diese wird in Abhängigkeit zur Kamera, also zum Betrachter, berechnet. 
 
-Die Lampen selbst werden übrigens mit einem anderen Shader in [light.wgsl](/renderer/src/light.wgsl) gerendert, da diese nicht von anderen Lampen bzw. Schatten beeinflusst werden sollen, schließlich leuchten sie.
+Die Lampen selbst werden übrigens mit einem anderen Shader in [light.wgsl](/renderer/src/light.wgsl) gerendert, da diese von allen Winkeln aus die volle Farbe haben sollen - schließlich leuchten sie.
 
-## Konfiguration
+## Dateistruktur
+Der Code liegt in [renderer/src](renderer/src). Die Ressourcen, die vom Programm geladen werden, liegen in [renderer/res](renderer/res) (Model-Dateien, Materials, Texturen usw.)
+### Konfigurationsdatei
+
 Die Szene beim Start des Programms deserialisiert aus der Datei [world.toml](/renderer/res/world.toml). Hier werden Informationen über alle Modelle in der Szene gespeichert, so z.B. der Name eines Modells, eine einzigartige ID, die Position in der Szene, die Rotation und der Pfad zur OBJ-Datei.
 
 Beim Klick auf *Save world* wird die sich im Arbeitsspeicher befindliche Welt serialisiert und in die Datei geschrieben.
@@ -76,7 +88,7 @@ Hier lassen sich alle Eigenschaften der Objekte in der Szene einstellen. Auf der
 Die nachfolgenden Reiter bieten Einstellmöglichkeiten für die im Model enthaltenen Meshes. Lichtemittierende Meshes bieten zudem hier die Möglichkeit, das ihnen zugeordnete Material anzupassen.
 
 ## Ampelsteuerung
-*zum Code: [Ampel -Klasse](/renderer/src/ampel.rs) | [Steuerung](/renderer/src/main.rs)*
+*zum Code: [Ampel -Klasse](/renderer/src/ampel.rs) | [Steuerung](https://github.com/realmayus/wgpu_renderer/blob/b1d530be185552076a3f79b3ee119f65661d316c/renderer/src/main.rs#L654)*
 
 Durch einen Klick auf **Start / Stop** lässt sich die Ampelsteuerung starten. Durch die Reflektion der Ampellichter auf der Straße ist die derzeitige Ampelphase aus jedem Winkel erkennbar, aber mit <kbd>A</kbd> bzw. <kbd>D</kbd> kann die Kreuzung unter allen Winkeln betrachtet werden.
 
