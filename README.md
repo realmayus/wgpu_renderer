@@ -3,7 +3,7 @@
 ![Screen Shot 2022-03-09 at 23 25 04](https://user-images.githubusercontent.com/38134006/157552898-5c21b137-e1cf-4140-8ad6-9c41ce231fc6.png)
 
 ## Download
-Hier kann das Programm kompiliert heruntergeladen werden: [Download (Windows)](https://github.com/realmayus/wgpu_renderer/raw/master/renderer.zip)
+Hier kann das Programm kompiliert heruntergeladen werden: [Download (Windows)](https://github.com/realmayus/wgpu_renderer/raw/master/renderer_neu.zip)
 
 Es ist wichtig, dass das Programm mit derselben Ordnerstruktur wie in der Zip-Datei entpackt wird. D.h. im selben Verzeichnis wie die EXE-Datei muss der Ordner `res` liegen. Das Programm benutzt relative Pfade beim Laden der Ressourcen und nur so kann gewährleistet werden, dass die benötigten Dateien gefunden werden.
 
