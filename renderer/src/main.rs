@@ -563,7 +563,7 @@ impl State {
             light_sources_buffer,
             light_sources_bind_group,
             only_show_emissive: false,
-            ampel_index: 0,
+            ampel_index: -1,
             next_cycle: std::time::Duration::new(0, 0),
             green_duration: 10,
             yellow_duration: 5,
@@ -651,11 +651,9 @@ impl State {
             bytemuck::cast_slice(&[self.light_model.meshes[0].mesh_uniform]),
         );
 
-        if self.next_cycle > std::time::Duration::new(0, 0)
-            && SystemTime::now().duration_since(UNIX_EPOCH).unwrap() > self.next_cycle
-        {
+        if SystemTime::now().duration_since(UNIX_EPOCH).unwrap() > self.next_cycle {
             match self.ampel_index {
-                0 => {
+                -1 => {
                     // All red
                     ampel::Ampel::from_model(State::find_model(
                         self.models.as_mut_slice(),
@@ -681,7 +679,39 @@ impl State {
                     ))
                     .unwrap()
                     .set_status(AmpelStatus::RED);
+                }
+                0 => {
+                    // red - red - red - red
+                    ampel::Ampel::from_model(State::find_model(
+                        self.models.as_mut_slice(),
+                        "a0c49f2b-5e48-48ee-85a2-86a88900617f".to_string(),
+                    ))
+                    .unwrap()
+                    .set_status(AmpelStatus::RED);
+                    ampel::Ampel::from_model(State::find_model(
+                        self.models.as_mut_slice(),
+                        "5a49699e-b09d-46bd-bafb-0463fcef5054".to_string(),
+                    ))
+                    .unwrap()
+                    .set_status(AmpelStatus::RED);
+                    ampel::Ampel::from_model(State::find_model(
+                        self.models.as_mut_slice(),
+                        "2be7a064-9ee4-4097-9797-d6d693595b3c".to_string(),
+                    ))
+                    .unwrap()
+                    .set_status(AmpelStatus::RED);
+                    ampel::Ampel::from_model(State::find_model(
+                        self.models.as_mut_slice(),
+                        "c67f737a-b2ad-43ad-ad21-99c87735a141".to_string(),
+                    ))
+                    .unwrap()
+                    .set_status(AmpelStatus::RED);
+
                     self.ampel_index = 1;
+                    self.next_cycle = SystemTime::now()
+                        .add(std::time::Duration::new(self.all_red_duration as u64, 0))
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
                 }
                 1 => {
                     // red-yellow - red - red-yellow - red
@@ -1173,34 +1203,36 @@ impl State {
 
             ui.separator();
             ui.add(
-                egui::Slider::new(&mut self.green_duration, 1u32..=20u32)
+                egui::Slider::new(&mut self.green_duration, 0u32..=20u32)
                     .clamp_to_range(true)
                     .text("Green duration"),
             );
             ui.add(
-                egui::Slider::new(&mut self.yellow_duration, 1u32..=20u32)
+                egui::Slider::new(&mut self.yellow_duration, 0u32..=20u32)
                     .clamp_to_range(true)
                     .text("Yellow duration"),
             );
             ui.add(
-                egui::Slider::new(&mut self.red_yellow_duration, 1u32..=20u32)
+                egui::Slider::new(&mut self.red_yellow_duration, 0u32..=20u32)
                     .clamp_to_range(true)
                     .text("Red-Yellow duration"),
             );
             ui.add(
-                egui::Slider::new(&mut self.all_red_duration, 1u32..=20u32)
+                egui::Slider::new(&mut self.all_red_duration, 0u32..=20u32)
                     .clamp_to_range(true)
                     .text("All-red duration"),
             );
             ui.label("Next cycle:");
             ui.label(format!("{}", self.next_cycle.as_secs()));
             if ui.button("Start / Stop").clicked() {
-                if self.next_cycle > std::time::Duration::new(0, 0) {
+                if self.ampel_index != -1 {
                     self.next_cycle = std::time::Duration::new(0, 0);
+                    self.ampel_index = -1;
                 } else {
                     self.next_cycle = std::time::SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap();
+                    self.ampel_index = 0;
                 }
             }
         });
@@ -1304,6 +1336,7 @@ fn main() {
             width: 1400,
             height: 800,
         }))
+        .with_title("Ampelsteuerung")
         .build(&event_loop)
         .expect("Can't open window");
 
