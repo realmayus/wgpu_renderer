@@ -1,12 +1,12 @@
-use std::f32::consts::PI;
 use anyhow::*;
+use std::f32::consts::PI;
 use std::ops::{Mul, Range};
 use std::path::Path;
 use tobj::LoadOptions;
 use uuid::Uuid;
 use wgpu::util::DeviceExt;
 
-use crate::{texture};
+use crate::texture;
 
 pub trait Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
@@ -53,7 +53,8 @@ pub enum MaterialType {
 }
 
 pub enum MaterialStructs {
-    DIFFUSE(Material), EMISSION(EmissiveMaterial)
+    DIFFUSE(Material),
+    EMISSION(EmissiveMaterial),
 }
 
 pub struct Material {
@@ -63,7 +64,6 @@ pub struct Material {
     pub bind_group: wgpu::BindGroup,
     pub uniform_buffer: wgpu::Buffer,
     pub uniform: MaterialUniform,
-
 }
 
 pub struct EmissiveMaterial {
@@ -153,7 +153,6 @@ impl Model {
         )?;
         let obj_materials = obj_materials?;
 
-        // We're assuming that the texture files are stored with the obj file
         let containing_folder = path.as_ref().parent().context("Directory has no parent")?;
 
         let mut materials: Vec<MaterialStructs> = Vec::new();
@@ -185,11 +184,10 @@ impl Model {
 
                     bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                         layout: &light_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: uniform_buffer.as_entire_binding(),
-                            }],
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: uniform_buffer.as_entire_binding(),
+                        }],
                         label: None,
                     });
 
@@ -200,21 +198,28 @@ impl Model {
                         uniform_buffer,
                         uniform,
                     }));
-                },
+                }
                 _ => {
                     println!("Added diffuse mesh");
                     mat_type = MaterialType::DIFFUSE;
                     let diffuse_path = mat.diffuse_texture;
                     if diffuse_path.is_empty() {
-                        diffuse_texture = texture::Texture::load(device, queue, containing_folder.join("solid_white.png"))?;
+                        diffuse_texture = texture::Texture::load(
+                            device,
+                            queue,
+                            containing_folder.join("solid_white.png"),
+                        )?;
                         println!("{:?}", mat.diffuse);
                         material_uniform = MaterialUniform {
                             diffuse_color: mat.diffuse,
                             use_diffuse_color: 1,
                         }
                     } else {
-                        diffuse_texture =
-                        texture::Texture::load(device, queue, containing_folder.join(diffuse_path))?;
+                        diffuse_texture = texture::Texture::load(
+                            device,
+                            queue,
+                            containing_folder.join(diffuse_path),
+                        )?;
                         material_uniform = MaterialUniform {
                             diffuse_color: [1.0, 1.0, 1.0],
                             use_diffuse_color: 0,
@@ -230,18 +235,18 @@ impl Model {
                     bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                         layout: texture_layout,
                         entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: uniform_buffer.as_entire_binding(),
-                        }
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 2,
+                                resource: uniform_buffer.as_entire_binding(),
+                            },
                         ],
                         label: Some(&format!("{:?} Bind Group", path.as_ref())),
                     });
@@ -253,11 +258,8 @@ impl Model {
                         uniform_buffer,
                         uniform: material_uniform,
                     }));
-
                 }
             }
-
-
         }
 
         let mut meshes = Vec::new();
@@ -291,14 +293,13 @@ impl Model {
             y = y / (m.mesh.positions.len() / 3) as f32;
             z = z / (m.mesh.positions.len() / 3) as f32;
 
-            let mut rot_mat = glam::Mat3::from_rotation_x(model_rot[0] * (PI/180.0));
-            rot_mat = rot_mat.mul(glam::Mat3::from_rotation_y(model_rot[1] * (PI/180.0)));
-            rot_mat = rot_mat.mul(glam::Mat3::from_rotation_z(model_rot[2] * (PI/180.0)));
+            let mut rot_mat = glam::Mat3::from_rotation_x(model_rot[0] * (PI / 180.0));
+            rot_mat = rot_mat.mul(glam::Mat3::from_rotation_y(model_rot[1] * (PI / 180.0)));
+            rot_mat = rot_mat.mul(glam::Mat3::from_rotation_z(model_rot[2] * (PI / 180.0)));
 
             for mut v in vertices.as_mut_slice() {
                 v.position = rot_mat.mul(glam::Vec3::from(v.position)).into();
             }
-
 
             let uniform = MeshUniform {
                 position: [0.0, 0.0, 0.0],
@@ -313,7 +314,7 @@ impl Model {
                 rot_mat_1: rot_mat.y_axis.into(),
                 _padding4: 0,
                 rot_mat_2: rot_mat.z_axis.into(),
-                _padding5: 0
+                _padding5: 0,
             };
 
             let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -342,7 +343,6 @@ impl Model {
                 }],
             });
 
-
             let mesh = Mesh {
                 name: m.name,
                 vertex_buffer,
@@ -354,23 +354,7 @@ impl Model {
                 material: m.mesh.material_id.unwrap_or(0),
             };
             meshes.push(mesh);
-
         }
-
-        // let mesh_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        //     label: Some(&format!("{:?} Uniform Buffer", path.as_ref())),
-        //     contents: bytemuck::cast_slice(&[mesh_uniform]),
-        //     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        // });
-        //
-        // let mesh_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        //     label: Some(&format!("{:?} Model bind group", path.as_ref())),
-        //     layout: model_layout,
-        //     entries: &[wgpu::BindGroupEntry {
-        //         binding: 0,
-        //         resource: mesh_buffer.as_entire_binding(),
-        //     }],
-        // });
 
         Ok(Self {
             id: obj_uuid,
@@ -434,7 +418,14 @@ where
         light_sources_bind_group: &'b wgpu::BindGroup,
         only_show_emissive: bool,
     ) {
-        self.draw_mesh_instanced(mesh, material, 0..1, camera_bind_group, light_sources_bind_group, only_show_emissive);
+        self.draw_mesh_instanced(
+            mesh,
+            material,
+            0..1,
+            camera_bind_group,
+            light_sources_bind_group,
+            only_show_emissive,
+        );
     }
 
     fn draw_mesh_instanced(
@@ -454,7 +445,7 @@ where
                 self.set_bind_group(0, &mat.bind_group, &[]);
                 self.set_bind_group(1, camera_bind_group, &[]);
                 self.set_bind_group(2, &mesh.mesh_bind_group, &[]);
-            },
+            }
             MaterialStructs::DIFFUSE(mat) => {
                 if only_show_emissive {
                     return;
@@ -477,7 +468,15 @@ where
         light_sources_bind_group: &'b wgpu::BindGroup,
         only_show_emissive: bool,
     ) {
-        self.draw_model_instanced(model, 0..1, camera_bind_group, light_sources_bind_group, render_pipeline, light_render_pipeline, only_show_emissive);
+        self.draw_model_instanced(
+            model,
+            0..1,
+            camera_bind_group,
+            light_sources_bind_group,
+            render_pipeline,
+            light_render_pipeline,
+            only_show_emissive,
+        );
     }
 
     fn draw_model_instanced(
@@ -493,10 +492,8 @@ where
         for mesh in &model.meshes {
             let material = &model.materials[mesh.material];
             match material {
-                MaterialStructs::EMISSION(_mat) => {
-                    self.set_pipeline(light_render_pipeline) },
-                MaterialStructs::DIFFUSE(_mat) => {
-                    self.set_pipeline(render_pipeline) },
+                MaterialStructs::EMISSION(_mat) => self.set_pipeline(light_render_pipeline),
+                MaterialStructs::DIFFUSE(_mat) => self.set_pipeline(render_pipeline),
             }
             self.draw_mesh_instanced(
                 mesh,
