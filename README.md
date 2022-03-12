@@ -138,7 +138,7 @@ Hier lassen sich alle Eigenschaften der Objekte in der Szene einstellen. Auf der
 Die nachfolgenden Reiter bieten Einstellmöglichkeiten für die im Model enthaltenen Meshes. Lichtemittierende Meshes bieten zudem hier die Möglichkeit, das ihnen zugeordnete Material anzupassen.
 
 ## Ampelsteuerung
-*zum Code: [Ampel -Klasse](/renderer/src/ampel.rs) | [Steuerung](https://github.com/realmayus/wgpu_renderer/blob/b1d530be185552076a3f79b3ee119f65661d316c/renderer/src/main.rs#L654)*
+*zum Code: [Ampel -Klasse](/renderer/src/ampel.rs) | [Steuerung](https://github.com/realmayus/wgpu_renderer/blob/master/renderer/src/main.rs#L637-L669)*
 
 Durch einen Klick auf **Start / Stop** lässt sich die Ampelsteuerung starten. Durch die Reflektion der Ampellichter auf der Straße ist die derzeitige Ampelphase aus jedem Winkel erkennbar, aber mit <kbd>A</kbd> bzw. <kbd>D</kbd> kann die Kreuzung unter allen Winkeln betrachtet werden.
 
