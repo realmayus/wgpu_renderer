@@ -195,7 +195,7 @@ Damit ein Start/Stop-Button implementiert werden konnte, wurde zudem ein Ampelin
 Wenn die Schaltung gestoppt wird, wird wieder der Ampelindex `-1` gesetzt.
 
 
-# Quellen
+## Quellen
 
 * learnOpenGL
 * learn WGPU
