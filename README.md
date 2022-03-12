@@ -25,6 +25,33 @@ In den Shadern können dann die Daten, die in den Buffers gespeichert werden, ve
 
 Ein Buffer hat eine Adresse, einen Pointer, die sog. BindGroup. BindGroups sind von Nöten, um vom CPU-seitigen Code Buffers an die GPU zu senden. Meherere BindGroups können Teil einer *RenderPipeline* sein - diese fasst alle Eigenschaften und Übertragungsmethoden eines Shaders zusammen und lässt sich spontan austauschen, bspw. um den Shader zu wechseln. Beim Übertragen von Daten an die GPU ist es zudem wichtig, bestimmte Memory Alignment-Regeln einzuhalten. Nur, wenn ein bestimmter Abstand zwischen bestimmten Datentypen in einem Uniform (Übertragungsmittel an den Shader) gewährleistet ist, kann die GPU ihren Arbeitsspeicherhaushalt optimisieren.
 
+```rs
+let uniform = LightUniform {   // (1)
+    ambient: mat.ambient,
+    constant: 1.0,
+    diffuse: mat.diffuse,
+    linear: 0.09,
+    specular: mat.specular,
+    quadratic: 0.032,
+};
+
+uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {  // (2)
+    label: Some("LightUniform Buffer"),
+    contents: bytemuck::cast_slice(&[uniform]),
+    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+});
+
+bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {   // (3)
+    layout: &light_layout,
+    entries: &[wgpu::BindGroupEntry {
+        binding: 0,
+        resource: uniform_buffer.as_entire_binding(),
+    }],
+    label: None,
+});
+```
+*Beispiel: Anordnen der Daten, die an die GPU gesendet werden (1), erstellen des Buffers auf der GPU (reservieren des Speichers) (2), erstellen der BindGroup, damit eine "Route" zwischen GPU-seitigem Buffer und CPU-seitigem Code entsteht (3)*
+
 ### 3D-Dateiformate
 Das von meinem Renderer verwendete Dateiformat ist `Wavefront OBJ`. Dabei handelt es sich um `.obj`-Dateien, die 
 #### Model
@@ -52,6 +79,13 @@ Dabei ist nicht die Lichtquelle für die Farbveränderung auf einem benachbarten
 *Die Zusammensetzung der Reflektion nach Blinn-Phong*
 
 Dabei besteht die Reflektion aus drei Teilen: Ambient, Diffuse und Specular. Ambient ist eine Annäherung an die Tatsache, dass Lichtstrahlen unendlich oft an Objekten in der Realität abprallen - selbst im Schatten ist es nie vollständig schwarz. Deshalb gibt man einem Objekt eine dunkle Grundfarbe. Diffuse bezeichnet den Teil des Lichts, der vom Objekt reflektiert wird. Dabei kommt es bei der Stärke auf den Winkel zur Lichtquelle an. Specular bezeichnet die spiegelnde Lichtkomponente. Diese wird in Abhängigkeit zur Kamera, also zum Betrachter, berechnet. 
+
+```
+    let lightDir: vec3<f32> = normalize(((light.position * rot_mat) + light.model_offset + light.worldpos) - (in.world_position));
+    let diff: f32 = max(dot(in.world_normal, lightDir), 0.0);
+    var diffuse: vec3<f32> = light.diffuse * diff * obj_color;
+```
+*Beispiel: Berechnung der Diffuse-Farbe eines Fragments* 
 
 Die Lampen selbst werden übrigens mit einem anderen Shader in [light.wgsl](/renderer/src/light.wgsl) gerendert, da diese von allen Winkeln aus die volle Farbe haben sollen - schließlich leuchten sie.
 
