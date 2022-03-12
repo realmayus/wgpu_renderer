@@ -191,3 +191,11 @@ Dabei sind immer zwei gegenüberliegende Ampeln gekoppelt und sind in der gleich
 Die Phasenlängen sind über die Slider im GUI einstellbar.
 Damit ein Start/Stop-Button implementiert werden konnte, wurde zudem ein Ampelindex `-1`eingeführt. Wenn dieser Index aktiv ist, werden alle Ampeln auf Rot gestellt, aber im Gegensatz zu anderen Indizes wird kein nachfolgender Index bestimmt. Beim Klick auf Start/Stop wird Index `0` aktiv, der ebenfalls alle Ampeln auf Rot setzt, jedoch einen Wert für `next_cycle` definiert und auch den nächsten Index auf `1` setzt.
 Wenn die Schaltung gestoppt wird, wird wieder der Ampelindex `-1` gesetzt.
+
+
+# Quellen
+
+* learnOpenGL
+* learn WGPU
+* Real-Time Rendering: Tomas Akenine-Möller
+* diverse Internetforen, eigenes Vorwissen
