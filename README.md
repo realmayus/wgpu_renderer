@@ -52,6 +52,20 @@ bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {   // (3)
 ```
 *Beispiel: Anordnen der Daten, die an die GPU gesendet werden (1), erstellen des Buffers auf der GPU (reservieren des Speichers) (2), erstellen der BindGroup, damit eine "Route" zwischen GPU-seitigem Buffer und CPU-seitigem Code entsteht (3)*
 
+```
+struct LightUniform {
+    ambient: vec3<f32>;
+    diffuse: vec3<f32>;
+    specular: vec3<f32>;
+    constant: f32;
+    linear: f32;
+    quadratic: f32;
+};
+[[group(2), binding(0)]]
+var<uniform> light: LightUniform;
+```
+*Beispiel: Entgegennahme der Daten im Shader-Code*
+
 ### 3D-Dateiformate
 Das von meinem Renderer verwendete Dateiformat ist `Wavefront OBJ`. Dabei handelt es sich um `.obj`-Dateien, die 
 #### Model
