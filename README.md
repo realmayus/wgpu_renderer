@@ -83,7 +83,7 @@ In OBJ-Dateien können sich mehrere Meshes ein Material teilen, aber jedes Mesh 
 
 
 ### Berechnung von Licht
-*zum Code: [Berechnung des Lichts in shader.wgsl](/renderer/src/shader.wgsl)*
+*zum Code: [Berechnung des Lichts in shader.wgsl](https://github.com/realmayus/wgpu_renderer/blob/ce337239373f508052291c2228470e65ad2ac706/renderer/src/shader.wgsl#L125)*
 
 
 Man bräuchte einen extrem leistungsfähigen Rechner, um Licht nach den physikalischen Gesetzen akkurat darzustellen - geschweige denn in Echtzeit. Deshalb gibt es verschiedene Annäherungen an die Wirklichkeit, die sehr viel weniger leistungshungrig sind. So wird in diesem Renderer bspw. das Blinn-Phong-Modell verwendet, um den Einfluss von Licht auf einem Objekt zu berechnen.
