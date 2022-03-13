@@ -12,8 +12,6 @@ Es ist wichtig, dass das Programm mit derselben Ordnerstruktur wie in der Zip-Da
 Falls sich das Programm direkt wieder schließt, kann es sein, dass ein Fehler aufgetreten ist. Diesen kann man sich anzeigen lassen, indem man das Programm durch die Kommandozeile öffnet. Dazu einfach mit dem Terminal in den Ordner der EXE-Datei springen und die EXE übers Terminal ausführen. Dann sollte in der Konsole ein Fehler angezeigt werden.
 
 ## Grundlagen
-### Wichtig
-Ich habe hier versucht, die Grundideen in meinem Programm etwas zu erläutern. Da es aber sehr komplex ist, ist es schwer, hier alles zu berücksichtigen. Vor allem kann ich Ihnen in der nächsten Stunde auch den Code näher erklären (Rust als Programmiersprache hat einige interessante Eigenschaften). Falls jedoch Fragen bestehen, können Sie mir gerne eine Email schreiben.
 
 ### Rust
 Der Renderer wurde in der Programmiersprache Rust entwickelt. Rust ist so nah an der Hardware wie z. B. C++, ist aber deutlich ergonomischer in der Handhabung und gewährleistet Memory Safety, d.h. dass es schlichtweg unmöglich ist, einen bereits vom Arbeitsspeicher gelöschten Wert zu lesen. Dadurch werden viele Fehler verhindert und können überhaupt nicht auftreten.
